@@ -1,0 +1,130 @@
+package com.antonzhdanov.smartweatherapp.domain.manager
+
+import android.content.SharedPreferences
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.core.content.edit
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlin.reflect.KProperty
+
+abstract class BasePreferenceManager(
+    private val prefs: SharedPreferences
+) {
+    protected fun getString(key: String, defaultValue: String?) =
+        prefs.getString(key, defaultValue)!!
+
+    private fun getBoolean(key: String, defaultValue: Boolean) = prefs.getBoolean(key, defaultValue)
+    private fun getInt(key: String, defaultValue: Int) = prefs.getInt(key, defaultValue)
+    private fun getFloat(key: String, defaultValue: Float) = prefs.getFloat(key, defaultValue)
+    private fun getColor(key: String, defaultValue: Color): Color {
+        val color = prefs.getString(key, null)
+        return if (color == null) defaultValue else Color(color.toULong())
+    }
+
+    protected inline fun <reified E : Enum<E>> getEnum(key: String, defaultValue: E) =
+        enumValueOf<E>(getString(key, defaultValue.name))
+
+    protected inline fun <reified T> getJson(key: String, defaultValue: T) =
+        Json.decodeFromString<T>(getString(key, Json.encodeToString(defaultValue)))
+
+    protected fun putString(key: String, value: String?) = prefs.edit { putString(key, value) }
+    private fun putBoolean(key: String, value: Boolean) = prefs.edit { putBoolean(key, value) }
+    private fun putInt(key: String, value: Int) = prefs.edit { putInt(key, value) }
+    private fun putFloat(key: String, value: Float) = prefs.edit { putFloat(key, value) }
+    private fun putColor(key: String, value: Color) =
+        prefs.edit { putString(key, value.value.toString()) }
+
+    protected inline fun <reified E : Enum<E>> putEnum(key: String, value: E) =
+        putString(key, value.name)
+
+    protected inline fun <reified T> putJson(key: String, value: T) =
+        putString(key, Json.encodeToString(value))
+
+    protected class Preference<T>(
+        private val key: String,
+        defaultValue: T,
+        getter: (key: String, defaultValue: T) -> T,
+        private val setter: (key: String, newValue: T) -> Unit
+    ) {
+        private var value by mutableStateOf(getter(key, defaultValue))
+
+        operator fun getValue(thisRef: Any?, property: KProperty<*>) = value
+        operator fun setValue(thisRef: Any?, property: KProperty<*>, newValue: T) {
+            value = newValue
+            setter(key, newValue)
+        }
+    }
+
+    protected fun stringPreference(
+        key: String,
+        defaultValue: String = ""
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getString,
+        setter = ::putString
+    )
+
+    protected fun booleanPreference(
+        key: String,
+        defaultValue: Boolean
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getBoolean,
+        setter = ::putBoolean
+    )
+
+    protected fun intPreference(
+        key: String,
+        defaultValue: Int
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getInt,
+        setter = ::putInt
+    )
+
+    protected fun floatPreference(
+        key: String,
+        defaultValue: Float
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getFloat,
+        setter = ::putFloat
+    )
+
+    protected fun colorPreference(
+        key: String,
+        defaultValue: Color
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getColor,
+        setter = ::putColor
+    )
+
+    protected inline fun <reified E : Enum<E>> enumPreference(
+        key: String,
+        defaultValue: E
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getEnum,
+        setter = ::putEnum
+    )
+
+    protected inline fun <reified T> jsonPreference(
+        key: String,
+        defaultValue: T
+    ) = Preference(
+        key = key,
+        defaultValue = defaultValue,
+        getter = ::getJson,
+        setter = ::putJson
+    )
+}
